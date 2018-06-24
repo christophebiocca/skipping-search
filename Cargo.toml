@@ -5,6 +5,7 @@ authors = ["Christophe Biocca <christophe.biocca@gmail.com>"]
 license = "Apache-2.0 OR MIT"
 readme = "README.md"
 categories = ["algorithms"]
+repository = "https://github.com/christophebiocca/skipping-search"
 
 [dev-dependencies]
 proptest = "0.7"
