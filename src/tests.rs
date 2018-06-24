@@ -1,8 +1,8 @@
 use ::{
     SkippingIterator,
-    PairSkippingSearchIntersection,
-    SkippingSearchMultiIntersection,
-    SkippingSearchCountingIntersection,
+    PairIntersection,
+    MultiIntersection,
+    CountingIntersection,
 };
 use proptest::strategy::{Strategy, ValueTree};
 use proptest::test_runner::{TestRunner, Config};
@@ -43,7 +43,7 @@ fn test_pair_intersection_empty_for_non_overlapping_slices() {
 
             prop_assert_eq!(
                 SkippingIterator::new(
-                    PairSkippingSearchIntersection::new(
+                    PairIntersection::new(
                         &lesser_slice[..],
                         &greater_slice[..],
                     ),
@@ -68,7 +68,7 @@ fn test_multi_intersection_empty_for_non_mutually_overlapping_slices() {
 
             prop_assert_eq!(
                 SkippingIterator::new(
-                    SkippingSearchMultiIntersection::new(
+                    MultiIntersection::new(
                         vec![
                             &left_slice[..],
                             &right_slice[..],
@@ -97,7 +97,7 @@ fn test_counting_intersection_empty_for_insufficiently_overlapping_slices() {
 
             prop_assert_eq!(
                 SkippingIterator::new(
-                    SkippingSearchCountingIntersection::new(
+                    CountingIntersection::new(
                         vec![
                             &lesser_slice[..],
                             &left_slice[..],
@@ -133,7 +133,7 @@ fn test_pair_intersection_results_for_overlapping_slices() {
 
             fn check_intersect(left : &[i32], right : &[i32], target : &[i32]) -> bool {
                 SkippingIterator::new(
-                    PairSkippingSearchIntersection::new(
+                    PairIntersection::new(
                         left,
                         right,
                     ),
@@ -201,7 +201,7 @@ fn test_multi_intersection_results_for_overlapping_slices() {
 
             fn check_intersect(slices : Vec<&[i32]>, target : &[i32]) -> bool {
                 SkippingIterator::new(
-                    SkippingSearchMultiIntersection::new(
+                    MultiIntersection::new(
                         slices,
                     ),
                 ).eq(
@@ -261,7 +261,7 @@ fn test_counting_intersection_results_for_sufficiently_overlapping_slices() {
 
             fn check_intersect(slices : Vec<&[i32]>, target_count : usize, target : &[i32]) -> bool {
                 SkippingIterator::new(
-                    SkippingSearchCountingIntersection::new(
+                    CountingIntersection::new(
                         slices.clone(),
                         target_count,
                     ),

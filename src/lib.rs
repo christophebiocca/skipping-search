@@ -10,14 +10,16 @@ use std::mem;
 mod tests;
 
 /// A trait used to implement inverted-index-style fast intersection.
-///
+/// It differs from Iterator in two main ways:
+/// - Items are yielded in sorted order.
+/// - Given an item, we can efficiently skip forward to it.
 pub trait SkippingSearch {
     type Item : Ord + Clone;
 
     /// Returns the smallest value for which
-    /// find_and_advance *may* return true
+    /// `find_and_advance` *may* return true.
     /// For efficiency reasons, making sure the value
-    /// is one for which find_and_advance *will*
+    /// is one for which `find_and_advance` *will*
     /// return true is preferred, when possible.
     #[inline]
     fn suggest_next(&self) -> Option<Self::Item>;
@@ -29,14 +31,15 @@ pub trait SkippingSearch {
     fn find_and_advance(&mut self, item : Self::Item) -> bool;
 
     /// Returns a lower/upper bound on the number of values
-    /// that can be obtained by using self.find_and_advance(self.suggest_next())
+    /// that can be obtained by using `self.find_and_advance(self.suggest_next())`
     /// repeatedly.
-    /// (0, None) is a valid, minimally constraining answer.
-    /// (n, Some(n)) is a maximally constraining answer.
+    /// `(0, None)` is a valid, minimally constraining answer.
+    /// `(n, Some(n))` is a maximally constraining answer.
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>);
 }
 
+/// Turns a `SkippingSearch` implementor into a standard iterator.
 pub struct SkippingIterator<S>(S) where S : SkippingSearch;
 
 impl<S> SkippingIterator<S> where S : SkippingSearch {
@@ -58,8 +61,8 @@ impl<S> Iterator for SkippingIterator<S> where S : SkippingSearch {
     }
 }
 
-// A cmp function that treats None as larger than anything else
-// This is useful here because None is what you get past the end of an array
+/// A cmp function that treats None as larger than anything else
+/// This is useful here because None is what you get past the end of an array
 fn none_largest_cmp<T>(item1 : &Option<T>, item2 : &Option<T>) -> Ordering where T : Ord {
     match (item1, item2) {
         (None, None) => Ordering::Equal,
@@ -69,6 +72,7 @@ fn none_largest_cmp<T>(item1 : &Option<T>, item2 : &Option<T>) -> Ordering where
     }
 }
 
+/// A struct that's exactly like Option, except None > Some(_)
 #[derive(Debug, PartialEq, Eq)]
 struct NoneLargest<V>(Option<V>) where V : Ord;
 
@@ -112,9 +116,10 @@ fn exponential_search<'a, T>(slice : &'a[T], item : &T) -> Result<&'a[T], &'a[T]
     })
 }
 
-/// Sorted slices are the basic building block of SkippingSearch
-/// TODO: Decide whether a wrapper type that debug_asserts! sortedness is
-/// appropriate to use here.
+/// Sorted slices are the basic building block of `SkippingSearch`.
+/// TODO: Decide whether a wrapper type that `debug_asserts!` sortedness is
+/// appropriate to use here, and whether we should allow selection of search method,
+/// like linear/binary_search/exponential_search.
 impl<'a, T> SkippingSearch for &'a [T] where T : Ord + 'a {
     type Item = &'a T;
 
@@ -135,12 +140,14 @@ impl<'a, T> SkippingSearch for &'a [T] where T : Ord + 'a {
     }
 }
 
-pub struct PairSkippingSearchIntersection<Left, Right> where Left : SkippingSearch, Right : SkippingSearch<Item=Left::Item> {
+/// Combines two `SkippingSearch` objects and only returns their pair-wise intersection.
+/// If you're going to combine more than 2 of the same type at once, consider `MultiIntersection` instead.
+pub struct PairIntersection<Left, Right> where Left : SkippingSearch, Right : SkippingSearch<Item=Left::Item> {
     left : Left,
     right : Right,
 }
 
-impl<Left, Right> PairSkippingSearchIntersection<Left, Right> where Left : SkippingSearch, Right : SkippingSearch<Item=Left::Item> {
+impl<Left, Right> PairIntersection<Left, Right> where Left : SkippingSearch, Right : SkippingSearch<Item=Left::Item> {
     pub fn new(left : Left, right : Right) -> Self {
         Self {
             left,
@@ -149,7 +156,7 @@ impl<Left, Right> PairSkippingSearchIntersection<Left, Right> where Left : Skipp
     }
 }
 
-impl<Left, Right> SkippingSearch for PairSkippingSearchIntersection<Left, Right> where Left : SkippingSearch, Right : SkippingSearch<Item=Left::Item> {
+impl<Left, Right> SkippingSearch for PairIntersection<Left, Right> where Left : SkippingSearch, Right : SkippingSearch<Item=Left::Item> {
     type Item = Left::Item;
 
     fn suggest_next(&self) -> Option<Self::Item> {
@@ -178,11 +185,12 @@ impl<Left, Right> SkippingSearch for PairSkippingSearchIntersection<Left, Right>
     }
 }
 
-pub struct SkippingSearchMultiIntersection<S> where S : SkippingSearch {
+/// Combines an arbitrary number of `SkippingSearch` objects, and returns only the items present in all of them.
+pub struct MultiIntersection<S> where S : SkippingSearch {
     sub_searches : Vec<S>,
 }
 
-impl<S> SkippingSearchMultiIntersection<S> where S : SkippingSearch {
+impl<S> MultiIntersection<S> where S : SkippingSearch {
     pub fn new(mut sub_searches : Vec<S>) -> Self {
         assert!(sub_searches.len() > 0);
         sub_searches.sort_by_key(|s|{
@@ -194,7 +202,7 @@ impl<S> SkippingSearchMultiIntersection<S> where S : SkippingSearch {
     }
 }
 
-impl<S> SkippingSearch for SkippingSearchMultiIntersection<S> where S : SkippingSearch {
+impl<S> SkippingSearch for MultiIntersection<S> where S : SkippingSearch {
     type Item = S::Item;
 
     fn suggest_next(&self) -> Option<Self::Item> {
@@ -217,12 +225,16 @@ impl<S> SkippingSearch for SkippingSearchMultiIntersection<S> where S : Skipping
     }
 }
 
-pub struct SkippingSearchCountingIntersection<S> where S : SkippingSearch {
+/// Combines an arbitrary number of `SkippingSearch` objects,
+/// and returns only the items present in at least `target_count` of them.
+/// Having `target_count == sub_searches.len()` or `target_count == 1` is valid but discouraged.
+/// Instead use dedicated intersection/union constructs.
+pub struct CountingIntersection<S> where S : SkippingSearch {
     sub_searches : Vec<S>,
     allowed_failures : usize,
 }
 
-impl<S> SkippingSearchCountingIntersection<S> where S : SkippingSearch {
+impl<S> CountingIntersection<S> where S : SkippingSearch {
     pub fn new(mut sub_searches : Vec<S>, target_count : usize) -> Self {
         assert!(target_count > 0);
         assert!(sub_searches.len() >= target_count);
@@ -237,7 +249,7 @@ impl<S> SkippingSearchCountingIntersection<S> where S : SkippingSearch {
     }
 }
 
-impl<S> SkippingSearch for SkippingSearchCountingIntersection<S> where S : SkippingSearch {
+impl<S> SkippingSearch for CountingIntersection<S> where S : SkippingSearch {
     type Item = S::Item;
 
     fn suggest_next(&self) -> Option<Self::Item> {
