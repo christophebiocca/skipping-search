@@ -241,6 +241,9 @@ pub struct MultiIntersection<S> where S : SkippingSearch {
 }
 
 impl<S> MultiIntersection<S> where S : SkippingSearch {
+    /// Assembles a multi-intersection out of other `SkippingSearch` objects.
+    /// # Panics
+    /// Will panic if `sub_searches.len() == 0`
     pub fn new(mut sub_searches : Vec<S>) -> Self {
         assert!(sub_searches.len() > 0);
         sub_searches.sort_by_key(|s|{
@@ -285,6 +288,10 @@ pub struct CountingIntersection<S> where S : SkippingSearch {
 }
 
 impl<S> CountingIntersection<S> where S : SkippingSearch {
+    /// Assembles a counting-intersection out of other `SkippingSearch` objects.
+    /// # Panics
+    /// Will panic if `sub_searches.len() < target_count`,
+    /// of if `target_count == 0`.
     pub fn new(mut sub_searches : Vec<S>, target_count : usize) -> Self {
         assert!(target_count > 0);
         assert!(sub_searches.len() >= target_count);
