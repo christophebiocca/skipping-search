@@ -14,7 +14,7 @@ mod tests;
 /// - Items are yielded in sorted order.
 /// - Given an item, we can efficiently skip forward to it.
 pub trait SkippingSearch {
-    type Item : Ord + Clone;
+    type Item : Ord;
 
     /// Returns the smallest value for which
     /// `find_and_advance` *may* return true.
@@ -28,7 +28,7 @@ pub trait SkippingSearch {
     /// Also mutates the receiver to forget about any values
     /// smaller than or equal to the item.
     #[inline]
-    fn find_and_advance(&mut self, item : Self::Item) -> bool;
+    fn find_and_advance(&mut self, item : &Self::Item) -> bool;
 
     /// Returns a lower/upper bound on the number of values
     /// that can be obtained by using `self.find_and_advance(self.suggest_next())`
@@ -53,7 +53,7 @@ impl<S> Iterator for SkippingIterator<S> where S : SkippingSearch {
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(item) = self.0.suggest_next() {
-            if self.0.find_and_advance(item.clone()) {
+            if self.0.find_and_advance(&item) {
                 return Some(item);
             }
         }
@@ -127,7 +127,7 @@ impl<'a, T> SkippingSearch for &'a [T] where T : Ord + 'a {
         self.first()
     }
 
-    fn find_and_advance(&mut self, item : &'a T) -> bool {
+    fn find_and_advance(&mut self, item : &&'a T) -> bool {
         let result = exponential_search(self, item);
         let found = result.is_ok();
         *self = result.unwrap_or_else(|s|{s});
@@ -167,8 +167,8 @@ impl<Left, Right> SkippingSearch for PairIntersection<Left, Right> where Left : 
         ).0
     }
 
-    fn find_and_advance(&mut self, item : Self::Item) -> bool {
-        self.left.find_and_advance(item.clone()) &&
+    fn find_and_advance(&mut self, item : &Self::Item) -> bool {
+        self.left.find_and_advance(item) &&
         self.right.find_and_advance(item)
     }
 
@@ -211,9 +211,9 @@ impl<S> SkippingSearch for MultiIntersection<S> where S : SkippingSearch {
         }).max().and_then(|o|{o.0})
     }
 
-    fn find_and_advance(&mut self, item : Self::Item) -> bool {
+    fn find_and_advance(&mut self, item : &Self::Item) -> bool {
         self.sub_searches.iter_mut().all(|s|{
-            s.find_and_advance(item.clone())
+            s.find_and_advance(item)
         })
     }
 
@@ -270,10 +270,10 @@ impl<S> SkippingSearch for CountingIntersection<S> where S : SkippingSearch {
         n_largest.into_iter().map(|r|{r.0}).min().expect("len() == capacity > 0").0
     }
 
-    fn find_and_advance(&mut self, item : Self::Item) -> bool {
+    fn find_and_advance(&mut self, item : &Self::Item) -> bool {
         let mut failures_left = self.allowed_failures;
         self.sub_searches.iter_mut().all(|s|{
-            s.find_and_advance(item.clone()) || if failures_left > 0 {
+            s.find_and_advance(item) || if failures_left > 0 {
                 failures_left -= 1;
                 true
             } else {
