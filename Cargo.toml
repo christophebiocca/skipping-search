@@ -1,5 +1,6 @@
 [package]
 name = "skipping-search"
+description = "A fast iterator variant for intersection computations."
 version = "0.1.0"
 authors = ["Christophe Biocca <christophe.biocca@gmail.com>"]
 license = "Apache-2.0 OR MIT"
