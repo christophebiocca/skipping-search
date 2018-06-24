@@ -1,0 +1,7 @@
+[package]
+name = "skipping-search"
+version = "0.1.0"
+authors = ["Christophe Biocca <christophe.biocca@gmail.com>"]
+
+[dev-dependencies]
+proptest = "0.7"
