@@ -1,3 +1,53 @@
+//! skipping-search is a fast iterator variant for intersection computations.
+//!
+//! # Examples
+//!
+//! Let's say you want to find the least common multiple of 4 different
+//! numbers and you've forgotten efficent ways of generating it.
+//! You can collect large arrays of the multiples of each, then use this
+//! crate to intersect them efficiently.
+//! ```rust
+//! use skipping_search::{SkippingIterator, MultiIntersection, CountingIntersection};
+//!
+//! let multiples = vec![12, 16, 22, 35].into_iter().map(|n|{
+//!     (1..).map(|i|{i * n}).take_while(|p|{p < &100_000}).collect::<Vec<_>>()
+//! }).collect::<Vec<_>>();
+//!
+//! let mut common_multiples = SkippingIterator::new(
+//!     MultiIntersection::new(
+//!         // Collect each vector as a slice.
+//!         multiples.iter().map(Vec::as_slice).collect(),
+//!     ),
+//! );
+//!
+//! assert_eq!(common_multiples.cloned().next(), Some(18480));
+//! ```
+//!
+//! Now that we've paid the cost of generating this data, we can make other combining queries very cheaply:
+//!
+//! ```rust
+//! # use skipping_search::{SkippingIterator, MultiIntersection, CountingIntersection};
+//! #
+//! # let multiples = vec![12, 16, 22, 35].into_iter().map(|n|{
+//! #     (1..).map(|i|{i * n}).take_while(|p|{p < &100_000}).collect::<Vec<_>>()
+//! # }).collect::<Vec<_>>();
+//! #
+//! #
+//! let mut subcommon_multiples = SkippingIterator::new(
+//!     CountingIntersection::new(
+//!         // Collect each vector as a slice.
+//!         multiples.iter().map(Vec::as_slice).collect(),
+//!         // We want any multiple common to at least 3 of the numbers
+//!         3,
+//!     ),
+//! );
+//!
+//! assert_eq!(
+//!     subcommon_multiples.cloned().take(10).collect::<Vec<_>>(),
+//!     vec![528, 1056, 1584, 1680, 2112, 2640, 3168, 3360, 3696, 4224],
+//! );
+//! ```
+
 #[cfg(test)]
 #[macro_use]
 extern crate proptest;
